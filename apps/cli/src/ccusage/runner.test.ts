@@ -121,20 +121,50 @@ describe("execCcusage", () => {
     expect(run).toHaveBeenNthCalledWith(2, "npx.cmd", ["-y", "ccusage@^20.0.17", "codex", "daily"]);
   });
 
-  it("does not mask a Bun execution failure with the npm fallback", async () => {
+  it("falls back to npx.cmd when Bun launches but fails (e.g. corrupt bunx cache)", async () => {
     const failedBun = new CcusageRunError({
       cause: Object.assign(new Error("bun x failed"), { code: 1 }),
       code: "command_failed",
       report: "daily",
       source: "codex",
     });
-    const run = vi.fn(() => Effect.fail(failedBun));
+    const run = vi
+      .fn()
+      .mockReturnValueOnce(Effect.fail(failedBun))
+      .mockReturnValueOnce(Effect.succeed('{"daily":[]}'));
+
+    await expect(
+      Effect.runPromise(
+        execCcusage(["codex", "daily"], "codex", "daily", { platform: "win32", run }),
+      ),
+    ).resolves.toBe('{"daily":[]}');
+    expect(run).toHaveBeenNthCalledWith(1, "bun", ["x", "ccusage@^20.0.17", "codex", "daily"]);
+    expect(run).toHaveBeenNthCalledWith(2, "npx.cmd", ["-y", "ccusage@^20.0.17", "codex", "daily"]);
+  });
+
+  it("surfaces the npm fallback error when both Bun and npm fail", async () => {
+    const failedBun = new CcusageRunError({
+      cause: Object.assign(new Error("bun x failed"), { code: 1 }),
+      code: "command_failed",
+      report: "daily",
+      source: "codex",
+    });
+    const failedNpm = new CcusageRunError({
+      cause: Object.assign(new Error("npx failed"), { code: 1 }),
+      code: "command_failed",
+      report: "daily",
+      source: "codex",
+    });
+    const run = vi
+      .fn()
+      .mockReturnValueOnce(Effect.fail(failedBun))
+      .mockReturnValueOnce(Effect.fail(failedNpm));
 
     const error = await ccusageErrorFor(
       execCcusage(["codex", "daily"], "codex", "daily", { platform: "win32", run }),
     );
-    expect(error).toBe(failedBun);
-    expect(run).toHaveBeenCalledOnce();
+    expect(error).toBe(failedNpm);
+    expect(run).toHaveBeenCalledTimes(2);
   });
 
   it("classifies command timeouts without trying the npm fallback", async () => {
