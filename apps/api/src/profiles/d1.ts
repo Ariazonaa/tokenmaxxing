@@ -5,7 +5,7 @@ import { Layer } from "effect";
 import { Option } from "effect";
 
 import { Drizzle } from "../database";
-import { ProfilesRepository } from "./service";
+import { ProfilesRepository, todayKeyUtc } from "./service";
 import { usageStreaks } from "./streaks";
 
 const makeD1ProfilesRepository = Effect.fn("makeD1ProfilesRepository")(function* () {
@@ -94,6 +94,7 @@ const makeD1ProfilesRepository = Effect.fn("makeD1ProfilesRepository")(function*
             .leftJoin(
               usageSourceStats,
               and(
+                eq(usageSourceStats.userId, usageDays.userId),
                 eq(usageSourceStats.deviceId, usageDays.deviceId),
                 eq(usageSourceStats.source, usageDays.source),
               ),
@@ -147,7 +148,10 @@ const makeD1ProfilesRepository = Effect.fn("makeD1ProfilesRepository")(function*
         const totalSpendUsd = totals?.totalSpendUsd ?? 0;
         const sessionCount =
           (sessionStats?.sessionCount ?? 0) + (fallbackSessions?.sessionCount ?? 0);
-        const streaks = usageStreaks(activeDateRows.map((row) => row.date));
+        const streaks = usageStreaks(
+          activeDateRows.map((row) => row.date),
+          todayKeyUtc(new Date()),
+        );
 
         return {
           activeDays,

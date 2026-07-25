@@ -66,6 +66,13 @@ interface CliLoginRepositoryShape {
   }): Effect.Effect<void, DatabaseError, any>;
   findRequest(code: string): Effect.Effect<Option.Option<CliLoginRequest>, DatabaseError, any>;
   deleteRequest(id: string): Effect.Effect<void, DatabaseError, any>;
+  /**
+   * Atomically claim an approved request for delivery: deletes the row only
+   * while it is still `approved` and reports whether this caller won the
+   * race. Concurrent polls for the same code can then hand out the parked
+   * token at most once.
+   */
+  claimApprovedRequest(id: string): Effect.Effect<boolean, DatabaseError, any>;
   findRequestUser(userId: string): Effect.Effect<Option.Option<CurrentUser>, DatabaseError, any>;
   /**
    * One batch: upsert the device to the approving user, re-home the
@@ -148,7 +155,13 @@ const makeCliLoginService = Effect.fn("makeCliLoginService")(function* () {
         return yield* Effect.fail(new LoginCodeNotFound({ code: request.code }));
       }
 
-      yield* repository.deleteRequest(request.id).pipe(Effect.orDie);
+      // Deletion is the delivery guard: only the poll that actually removes
+      // the still-approved row is allowed to return the parked token, so a
+      // code hands out its token exactly once even under concurrent polls.
+      const claimed = yield* repository.claimApprovedRequest(request.id).pipe(Effect.orDie);
+      if (!claimed) {
+        return { status: "pending" } as const;
+      }
 
       return { status: "complete", token: request.token, user: user.value } as const;
     }),

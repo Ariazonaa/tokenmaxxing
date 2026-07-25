@@ -6,7 +6,7 @@ import {
   usageSourceStats,
   users,
 } from "@tokenmaxxing/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { Effect } from "effect";
 import { Layer } from "effect";
 import { Option } from "effect";
@@ -47,6 +47,17 @@ const makeD1CliLoginRepository = Effect.fn("makeD1CliLoginRepository")(function*
     deleteRequest: (id) =>
       Effect.gen(function* () {
         yield* database.use((db) => db.delete(cliLoginRequests).where(eq(cliLoginRequests.id, id)));
+      }),
+    claimApprovedRequest: (id) =>
+      Effect.gen(function* () {
+        const deleted = yield* database.use((db) =>
+          db
+            .delete(cliLoginRequests)
+            .where(and(eq(cliLoginRequests.id, id), eq(cliLoginRequests.status, "approved")))
+            .returning({ id: cliLoginRequests.id }),
+        );
+
+        return deleted.length > 0;
       }),
     findRequestUser: (userId) =>
       Effect.gen(function* () {

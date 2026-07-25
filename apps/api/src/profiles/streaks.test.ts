@@ -4,25 +4,30 @@ import { usageStreaks } from "./streaks";
 
 describe("usageStreaks", () => {
   it("returns zero streaks for an empty profile", () => {
-    expect(usageStreaks([])).toEqual({ currentStreakDays: 0, longestStreakDays: 0 });
+    expect(usageStreaks([], "2026-06-06")).toEqual({
+      currentStreakDays: 0,
+      longestStreakDays: 0,
+    });
   });
 
-  it("deduplicates dates and finds longest plus latest streak", () => {
+  it("counts the current streak when the latest active day is today", () => {
     expect(
-      usageStreaks([
-        "2026-06-01",
-        "2026-06-01",
-        "2026-06-02",
-        "2026-06-04",
-        "2026-06-05",
+      usageStreaks(
+        ["2026-06-01", "2026-06-01", "2026-06-02", "2026-06-04", "2026-06-05", "2026-06-06"],
         "2026-06-06",
-      ]),
+      ),
     ).toEqual({ currentStreakDays: 3, longestStreakDays: 3 });
   });
 
-  it("keeps the latest streak distinct from the longest streak", () => {
+  it("resets the current streak to zero when the latest active day is in the past", () => {
     expect(
-      usageStreaks(["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-05", "2026-06-06"]),
+      usageStreaks(["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-05", "2026-06-06"], "2026-06-10"),
+    ).toEqual({ currentStreakDays: 0, longestStreakDays: 3 });
+  });
+
+  it("keeps the longest streak even when the current streak is active but shorter", () => {
+    expect(
+      usageStreaks(["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-05", "2026-06-06"], "2026-06-06"),
     ).toEqual({ currentStreakDays: 2, longestStreakDays: 3 });
   });
 });
