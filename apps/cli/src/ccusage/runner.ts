@@ -161,10 +161,19 @@ function execCcusage(
 
   return runInvocation(primary).pipe(
     Effect.catch((error: CcusageRunError) =>
-      error.code === "command_not_found" ? runInvocation(fallback) : Effect.fail(error),
+      // A missing Bun or a Bun-level launch failure (e.g. a corrupt bunx
+      // package cache) are environment problems the npm shim can recover
+      // from — try it before surfacing the error. Timeouts are not retried:
+      // they reflect a slow report, not a broken Bun invocation.
+      FALLBACK_CODES.has(error.code) ? runInvocation(fallback) : Effect.fail(error),
     ),
   );
 }
+
+const FALLBACK_CODES: ReadonlySet<CcusageRunErrorCode> = new Set([
+  "command_not_found",
+  "command_failed",
+]);
 
 function makeCcusageCommandRunner(source: string, report: CcusageReportKind): CcusageCommandRunner {
   return (command, commandArgs) =>
