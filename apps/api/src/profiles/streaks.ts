@@ -3,7 +3,7 @@ interface UsageStreaks {
   longestStreakDays: number;
 }
 
-function usageStreaks(dates: readonly string[]): UsageStreaks {
+function usageStreaks(dates: readonly string[], today: string): UsageStreaks {
   const sortedDates = [...new Set(dates)].sort();
   let current = 0;
   let longest = 0;
@@ -15,8 +15,12 @@ function usageStreaks(dates: readonly string[]): UsageStreaks {
     previous = date;
   }
 
+  // The current streak only counts if the most recent active day is today;
+  // a run that ended in the past is no longer "current".
+  const currentStreakDays = previous === today ? current : 0;
+
   return {
-    currentStreakDays: current,
+    currentStreakDays,
     longestStreakDays: longest,
   };
 }
